@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define  _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <Windows.h>
 #include <WinSock2.h>
@@ -57,84 +58,54 @@ int main(int agrs, const char* argv[]) {
 	WSAStartup(ver, &dat);
 
 	// 1 建立一个socket
-	SOCKET _sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	SOCKET _sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (INVALID_SOCKET == _sock) {
 		printf("socket创建失败\n");
 	}
 	else {
-		printf("socket创建成功\n");
+		printf("socket建立成功\n");
 	}
 
-	// 2 绑定接受客户端连接的端口 bind
+	// 2 链接服务器 connect
 	sockaddr_in _sin = {};
 	_sin.sin_family = AF_INET;
 	_sin.sin_port = htons(4567);	// host to net unsigned short
-	_sin.sin_addr.S_un.S_addr = INADDR_ANY; // inet_addr("127.0.0.0")
-	if (bind(_sock, (sockaddr*)(&_sin), sizeof(sockaddr_in)) == SOCKET_ERROR) {
-		printf("IP地址和端口绑定失败\n");
+	_sin.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+	int ret = connect(_sock, (sockaddr*)(&_sin), sizeof(sockaddr_in));
+	if (SOCKET_ERROR == ret) {
+		printf("服务器链接失败\n");
 	}
 	else {
-		printf("IP地址和端口绑定成功\n");
+		printf("服务器链接成功\n");
 	}
 
-	//3 监听网络端口 listen
-	if (SOCKET_ERROR == listen(_sock, 5)) {
-		printf("端口监听失败\n");
-	}
-	else {
-		printf("端口监听 ing...\n");
-	}
-
-	//4 等待接受客户端连接 accept
-	sockaddr_in clientAddr = {};
-	int nAddrLen = sizeof(sockaddr_in);
-	SOCKET _cSock = INVALID_SOCKET;
-	_cSock = accept(_sock, (sockaddr*)(&clientAddr), &nAddrLen);
-	if (INVALID_SOCKET == _cSock) {
-		printf("连接客户端失败\n");
-	}
-	else {
-		printf("客户端链接成功, ip = %s， socket = %d\n", inet_ntoa(clientAddr.sin_addr), _cSock);
-
-	}
-
-
-	while (true)
-	{
-
-		// 创建接收缓冲区
-		char _recvBuf[128] = {};
-		// 5 接收客户端的请求报文
-		int len = recv(_cSock, _recvBuf, 128, 0);
-		if (len <= 0) {
-			printf("客户端退出！\n");
+	// 进行数据通信
+	char cmdBuf[128] = {};
+	while (true) {
+		scanf("%s", cmdBuf);
+		if (0 == strcmp(cmdBuf, "exit")) {
 			break;
 		}
 		else {
-			printf("收到指令: %s", _recvBuf);
+			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
 		}
+		//3 接收服务器信息 recv
+		char recvBuf[128] = {};
+		int nlen = recv(_sock, recvBuf, 128, 0);
 
-		// 6 处理请求 向客户端发送一条数据send
-		if (0 == strcmp(_recvBuf, "getName")) {
-			const char msgbuff[] = "Hello, i'm Server!";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
-		}
-		else if (0 == strcmp(_recvBuf, "getAge")) {
-			const char msgbuff[] = "i'm eighteen!";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
-		}
-		else {
-			const char msgbuff[] = "???";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
+		if (nlen > 0) {
+			printf("接收到数据：%s \n", recvBuf);
 		}
 	}
 
-	//6 关闭socket  closesocket
+
+	//4 关闭socket  closesocket
 	closesocket(_sock);
 
 	WSACleanup();
 
-	printf("服务端程序退出\n");
+	printf("客户端退出\n");
+
 	getchar();
 
 	return 0;
