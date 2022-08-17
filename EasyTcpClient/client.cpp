@@ -46,6 +46,11 @@ WSAStartup(ver, &dat); Õâ¸öº¯ÊýÔÚÄÜÕý³£Í¨¹ý±àÒë£¬µ«ÊÇÔÚÁ´½ÓµÄÊ±ºò¾Í»á±¨´í£¬ÊÇÒòÎ
 
 using namespace std;
 
+struct DataPackage {
+	int age;
+	char name[32];
+};
+
 int main(int agrs, const char* argv[]) {
 	// Æô¶¯Windows socket 2.x»·¾³
 
@@ -94,7 +99,9 @@ int main(int agrs, const char* argv[]) {
 		int nlen = recv(_sock, recvBuf, 128, 0);
 
 		if (nlen > 0) {
-			printf("½ÓÊÕµ½Êý¾Ý£º%s \n", recvBuf);
+			//printf("½ÓÊÕµ½Êý¾Ý£º%s \n", recvBuf);
+			DataPackage* dp = (DataPackage*)recvBuf;
+			printf("½ÓÊÕµ½Êý¾Ý£ºage = %d,  name = %s \n", dp->age, dp->name);
 		}
 	}
 

@@ -45,6 +45,11 @@ WSAStartup(ver, &dat); Õâ¸öº¯ÊıÔÚÄÜÕı³£Í¨¹ı±àÒë£¬µ«ÊÇÔÚÁ´½ÓµÄÊ±ºò¾Í»á±¨´í£¬ÊÇÒòÎ
 
 using namespace std;
 
+struct DataPackage {
+	int age;
+	char name[32];
+};
+
 int main(int agrs, const char* argv[]) {
 	// Æô¶¯Windows socket 2.x»·¾³
 
@@ -111,7 +116,7 @@ int main(int agrs, const char* argv[]) {
 			break;
 		}
 		else {
-			printf("ÊÕµ½Ö¸Áî: %s", _recvBuf);
+			printf("ÊÕµ½Ö¸Áî: %s\n", _recvBuf);
 		}
 
 		// 6 ´¦ÀíÇëÇó Ïò¿Í»§¶Ë·¢ËÍÒ»ÌõÊı¾İsend
@@ -122,6 +127,10 @@ int main(int agrs, const char* argv[]) {
 		else if (0 == strcmp(_recvBuf, "getAge")) {
 			const char msgbuff[] = "i'm eighteen!";
 			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
+		}
+		else if (0 == strcmp(_recvBuf, "getInfo")) {
+			DataPackage dp = { 90, "invi" };
+			send(_cSock, (const char*)(&dp), sizeof(struct DataPackage), 0);
 		}
 		else {
 			const char msgbuff[] = "???";
