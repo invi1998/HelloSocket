@@ -46,9 +46,35 @@ WSAStartup(ver, &dat); Õâ¸öº¯ÊıÔÚÄÜÕı³£Í¨¹ı±àÒë£¬µ«ÊÇÔÚÁ´½ÓµÄÊ±ºò¾Í»á±¨´í£¬ÊÇÒòÎ
 
 using namespace std;
 
-struct DataPackage {
-	int age;
-	char name[32];
+enum CMD {
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_LOGIN_RET,
+	CMD_LOGOUT_RET
+};
+
+struct DataHeader {
+	short dataLength;		// Êı¾İ³¤¶È
+	short cmd;	// ÃüÁî
+};
+
+struct Login {
+	char userName[32];
+	char passWord[32];
+};
+
+struct LoginRet {
+	int res;
+	char msg[32];
+};
+
+struct Logout {
+	char userName[32];
+};
+
+struct LogoutRet {
+	int res;
+	char msg[32];
 };
 
 int main(int agrs, const char* argv[]) {
@@ -87,21 +113,68 @@ int main(int agrs, const char* argv[]) {
 	// ½øĞĞÊı¾İÍ¨ĞÅ
 	char cmdBuf[128] = {};
 	while (true) {
-		scanf("%s", cmdBuf);
+		printf("\nÇëÊäÈëÖ¸Áî£º\n");
+		memset(cmdBuf, 0, sizeof(cmdBuf));
+		scanf_s("%s", cmdBuf, 128);
 		if (0 == strcmp(cmdBuf, "exit")) {
 			break;
 		}
-		else {
-			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
-		}
-		//3 ½ÓÊÕ·şÎñÆ÷ĞÅÏ¢ recv
-		char recvBuf[128] = {};
-		int nlen = recv(_sock, recvBuf, 128, 0);
+		else if (0 == strcmp(cmdBuf, "login")) {
+			Login login = {};
+			char buf[32] = {};
+			printf("\nÇëÊäÈëÓÃ»§Ãû£º\n");
+			scanf_s("%s", buf, 32);
+			strcpy_s(login.userName, 32, buf);
+			memset(buf, 0, sizeof(buf));
+			printf("\nÇëÊäÈëÃÜÂë£º\n");
+			scanf_s("%s", buf, 32);
+			strcpy_s(login.passWord, 32, buf);
+			
+			// ÏûÏ¢Í·
+			DataHeader dh_login = { sizeof(login),  CMD_LOGIN };
 
-		if (nlen > 0) {
-			//printf("½ÓÊÕµ½Êı¾İ£º%s \n", recvBuf);
-			DataPackage* dp = (DataPackage*)recvBuf;
-			printf("½ÓÊÕµ½Êı¾İ£ºage = %d,  name = %s \n", dp->age, dp->name);
+			send(_sock, (const char*)(&dh_login), sizeof(dh_login), 0);
+
+			send(_sock, (const char*)(&login), sizeof(login), 0);
+
+			// ½ÓÊÕ·şÎñÆ÷·µ»ØÊı¾İ
+			DataHeader dh_ret = {};
+			LoginRet loginret = {};
+			int dh_len = recv(_sock, (char*)(&dh_ret), sizeof(DataHeader), 0);
+			if (dh_len > 0) {
+				int ret_len = recv(_sock, (char*)(&loginret), dh_ret.dataLength, 0);
+				if (ret_len > 0) {
+					printf("µÇÂ¼×´Ì¬Âë£º%d£¬ µÇÂ¼Çé¿ö£º%s\n", loginret.res, loginret.msg);
+				}
+			}
+		}
+		else if (0 == strcmp(cmdBuf, "logout")) {
+			Logout logout = {};
+			char buf[32] = {};
+			printf("\nÇëÊäÈëÍË³öÓÃ»§Ãû\n");
+			scanf_s("%s", buf, 32);
+			strcpy_s(logout.userName, 32, buf);
+
+			// ÏûÏ¢Í·
+			DataHeader dh_logout = { sizeof(logout),  CMD_LOGOUT };
+
+			send(_sock, (const char*)(&dh_logout), sizeof(dh_logout), 0);
+
+			send(_sock, (const char*)(&logout), sizeof(logout), 0);
+
+			// ½ÓÊÕ·şÎñÆ÷·µ»ØÊı¾İ
+			DataHeader dh_ret = {};
+			LoginRet logoutret = {};
+			int dh_len = recv(_sock, (char*)(&dh_ret), sizeof(DataHeader), 0);
+			if (dh_len > 0) {
+				int ret_len = recv(_sock, (char*)(&logoutret), dh_ret.dataLength, 0);
+				if (ret_len > 0) {
+					printf("ÍË³öµÇÂ¼×´Ì¬Âë£º%d£¬ ÍË³öÇé¿ö£º%s\n", logoutret.res, logoutret.msg);
+				}
+			}
+		}
+		else {
+			printf("ÃüÁî²»Ö§³Ö\n");
 		}
 	}
 

@@ -45,9 +45,36 @@ WSAStartup(ver, &dat); Õâ¸öº¯ÊıÔÚÄÜÕı³£Í¨¹ı±àÒë£¬µ«ÊÇÔÚÁ´½ÓµÄÊ±ºò¾Í»á±¨´í£¬ÊÇÒòÎ
 
 using namespace std;
 
-struct DataPackage {
-	int age;
-	char name[32];
+enum CMD {
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_LOGIN_RET,
+	CMD_LOGOUT_RET,
+	CMD_ERROR
+};
+
+struct DataHeader {
+	short dataLength;		// Êı¾İ³¤¶È
+	short cmd;	// ÃüÁî
+};
+
+struct Login {
+	char userName[32];
+	char passWord[32];
+};
+
+struct LoginRet {
+	int res;
+	char msg[32];
+};
+
+struct Logout {
+	char userName[32];
+};
+
+struct LogoutRet {
+	int res;
+	char msg[32];
 };
 
 int main(int agrs, const char* argv[]) {
@@ -106,35 +133,65 @@ int main(int agrs, const char* argv[]) {
 
 	while (true)
 	{
+		// ¶¨ÒåÏûÏ¢Í·
+		DataHeader dh = {};
 
-		// ´´½¨½ÓÊÕ»º³åÇø
-		char _recvBuf[128] = {};
 		// 5 ½ÓÊÕ¿Í»§¶ËµÄÇëÇó±¨ÎÄ
-		int len = recv(_cSock, _recvBuf, 128, 0);
+		int len = recv(_cSock, (char*)(&dh), sizeof(DataHeader), 0);
 		if (len <= 0) {
 			printf("¿Í»§¶ËÍË³ö£¡\n");
 			break;
 		}
 		else {
-			printf("ÊÕµ½Ö¸Áî: %s\n", _recvBuf);
+			printf("ÊÕµ½Ö¸Áî: %d£¬ Êı¾İ³¤¶È: %d\n", dh.cmd, dh.dataLength);
 		}
 
 		// 6 ´¦ÀíÇëÇó Ïò¿Í»§¶Ë·¢ËÍÒ»ÌõÊı¾İsend
-		if (0 == strcmp(_recvBuf, "getName")) {
-			const char msgbuff[] = "Hello, i'm Server!";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
+		switch (dh.cmd)
+		{
+		case CMD_LOGIN:
+		{
+			Login login = {};
+			int log_len = recv(_cSock, (char*)&login, dh.dataLength, 0);
+			if (log_len > 0) {
+				printf("µÇÂ¼ÓÃ»§£º%s, ÃÜÂë£º%s\n", login.userName, login.passWord);
+			}
+
+			// »ØÓ¦±¨ÎÄ
+			LoginRet loginret = { 200, "µÇÂ¼³É¹¦\n" };
+			// ÏÈ×éÖ¯±¨ÎÄÍ·
+			DataHeader dh_loginret = {
+				sizeof(loginret),
+				CMD_LOGIN_RET
+			};
+			send(_cSock, (const char*)(&dh_loginret), sizeof(dh_loginret), 0);
+			send(_cSock, (const char*)(&loginret), sizeof(loginret), 0);
 		}
-		else if (0 == strcmp(_recvBuf, "getAge")) {
-			const char msgbuff[] = "i'm eighteen!";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
+		break;
+		case CMD_LOGOUT:
+		{
+			Logout logout = {};
+			int log_len = recv(_cSock, (char*)(&logout), dh.dataLength, 0);
+			if (log_len > 0) {
+				printf("ÓÃ»§ ¡¾%s¡¿ÇëÇóÍË³öµÇÂ¼\n", logout.userName);
+			}
+
+			// »ØÓ¦±¨ÎÄ
+			LoginRet logoutret = { 200, "ÍË³öµÇÂ¼³É¹¦\n" };
+			// ÏÈ×éÖ¯±¨ÎÄÍ·
+			DataHeader dh_logoutret = {
+				sizeof(logoutret),
+				CMD_LOGOUT_RET
+			};
+			send(_cSock, (const char*)(&dh_logoutret), sizeof(dh_logoutret), 0);
+			send(_cSock, (const char*)(&logoutret), sizeof(logoutret), 0);
+
 		}
-		else if (0 == strcmp(_recvBuf, "getInfo")) {
-			DataPackage dp = { 90, "invi" };
-			send(_cSock, (const char*)(&dp), sizeof(struct DataPackage), 0);
-		}
-		else {
-			const char msgbuff[] = "???";
-			send(_cSock, msgbuff, strlen(msgbuff) + 1, 0);
+		break;
+		default:
+			DataHeader dh_err = { 0, CMD_ERROR };
+			send(_cSock, (const char*)(&dh_err), sizeof(dh_err), 0);
+		break;
 		}
 	}
 
