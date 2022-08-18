@@ -58,21 +58,37 @@ struct DataHeader {
 	short cmd;	// 命令
 };
 
-struct Login {
+struct Login : public DataHeader {
+	Login() {
+		dataLength = sizeof(Login);
+		cmd = CMD_LOGIN;
+	}
 	char userName[32];
 	char passWord[32];
 };
 
-struct LoginRet {
+struct LoginRet : public DataHeader {
+	LoginRet() {
+		dataLength = sizeof(LoginRet);
+		cmd = CMD_LOGIN_RET;
+	}
 	int res;
 	char msg[32];
 };
 
-struct Logout {
+struct Logout : public DataHeader {
+	Logout() {
+		dataLength = sizeof(Logout);
+		cmd = CMD_LOGOUT;
+	}
 	char userName[32];
 };
 
-struct LogoutRet {
+struct LogoutRet : public DataHeader {
+	LogoutRet() {
+		dataLength = sizeof(LogoutRet);
+		cmd = CMD_LOGOUT_RET;
+	}
 	int res;
 	char msg[32];
 };
@@ -142,9 +158,6 @@ int main(int agrs, const char* argv[]) {
 			printf("客户端退出！\n");
 			break;
 		}
-		else {
-			printf("收到指令: %d， 数据长度: %d\n", dh.cmd, dh.dataLength);
-		}
 
 		// 6 处理请求 向客户端发送一条数据send
 		switch (dh.cmd)
@@ -152,38 +165,32 @@ int main(int agrs, const char* argv[]) {
 		case CMD_LOGIN:
 		{
 			Login login = {};
-			int log_len = recv(_cSock, (char*)&login, dh.dataLength, 0);
+			int log_len = recv(_cSock, (char*)&login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
 			if (log_len > 0) {
+				printf("收到指令: %d， 数据长度: %d\n", login.cmd, login.dataLength);
 				printf("登录用户：%s, 密码：%s\n", login.userName, login.passWord);
 			}
 
 			// 回应报文
-			LoginRet loginret = { 200, "登录成功\n" };
-			// 先组织报文头
-			DataHeader dh_loginret = {
-				sizeof(loginret),
-				CMD_LOGIN_RET
-			};
-			send(_cSock, (const char*)(&dh_loginret), sizeof(dh_loginret), 0);
+			LoginRet loginret;
+			loginret.res = 200;
+			strcpy_s(loginret.msg, "登录成功\n");
 			send(_cSock, (const char*)(&loginret), sizeof(loginret), 0);
 		}
 		break;
 		case CMD_LOGOUT:
 		{
 			Logout logout = {};
-			int log_len = recv(_cSock, (char*)(&logout), dh.dataLength, 0);
+			int log_len = recv(_cSock, (char*)(&logout) + sizeof(DataHeader), sizeof(Logout) - sizeof(DataHeader), 0);
 			if (log_len > 0) {
+				printf("收到指令: %d， 数据长度: %d\n", logout.cmd, logout.dataLength);
 				printf("用户 【%s】请求退出登录\n", logout.userName);
 			}
 
 			// 回应报文
-			LoginRet logoutret = { 200, "退出登录成功\n" };
-			// 先组织报文头
-			DataHeader dh_logoutret = {
-				sizeof(logoutret),
-				CMD_LOGOUT_RET
-			};
-			send(_cSock, (const char*)(&dh_logoutret), sizeof(dh_logoutret), 0);
+			LogoutRet logoutret;
+			logoutret.res = 200;
+			strcpy_s(logoutret.msg, "退出登录成功\n");
 			send(_cSock, (const char*)(&logoutret), sizeof(logoutret), 0);
 
 		}
@@ -191,7 +198,7 @@ int main(int agrs, const char* argv[]) {
 		default:
 			DataHeader dh_err = { 0, CMD_ERROR };
 			send(_cSock, (const char*)(&dh_err), sizeof(dh_err), 0);
-		break;
+			break;
 		}
 	}
 

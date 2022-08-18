@@ -50,7 +50,8 @@ enum CMD {
 	CMD_LOGIN,
 	CMD_LOGOUT,
 	CMD_LOGIN_RET,
-	CMD_LOGOUT_RET
+	CMD_LOGOUT_RET,
+	CMD_ERROR
 };
 
 struct DataHeader {
@@ -58,21 +59,37 @@ struct DataHeader {
 	short cmd;	// 命令
 };
 
-struct Login {
+struct Login : public DataHeader {
+	Login() {
+		dataLength = sizeof(Login);
+		cmd = CMD_LOGIN;
+	}
 	char userName[32];
 	char passWord[32];
 };
 
-struct LoginRet {
+struct LoginRet : public DataHeader {
+	LoginRet() {
+		dataLength = sizeof(LoginRet);
+		cmd = CMD_LOGIN_RET;
+	}
 	int res;
 	char msg[32];
 };
 
-struct Logout {
+struct Logout : public DataHeader {
+	Logout() {
+		dataLength = sizeof(Logout);
+		cmd = CMD_LOGOUT;
+	}
 	char userName[32];
 };
 
-struct LogoutRet {
+struct LogoutRet : public DataHeader {
+	LogoutRet() {
+		dataLength = sizeof(LogoutRet);
+		cmd = CMD_LOGOUT_RET;
+	}
 	int res;
 	char msg[32];
 };
@@ -129,23 +146,14 @@ int main(int agrs, const char* argv[]) {
 			printf("\n请输入密码：\n");
 			scanf_s("%s", buf, 32);
 			strcpy_s(login.passWord, 32, buf);
-			
-			// 消息头
-			DataHeader dh_login = { sizeof(login),  CMD_LOGIN };
-
-			send(_sock, (const char*)(&dh_login), sizeof(dh_login), 0);
 
 			send(_sock, (const char*)(&login), sizeof(login), 0);
 
 			// 接收服务器返回数据
-			DataHeader dh_ret = {};
 			LoginRet loginret = {};
-			int dh_len = recv(_sock, (char*)(&dh_ret), sizeof(DataHeader), 0);
-			if (dh_len > 0) {
-				int ret_len = recv(_sock, (char*)(&loginret), dh_ret.dataLength, 0);
-				if (ret_len > 0) {
-					printf("登录状态码：%d， 登录情况：%s\n", loginret.res, loginret.msg);
-				}
+			int ret_len = recv(_sock, (char*)(&loginret), sizeof(LoginRet), 0);
+			if (ret_len > 0) {
+				printf("收到回应：%d,  数据长度：%d,  登录状态码：%d， 登录情况：%s\n", loginret.cmd, loginret.dataLength, loginret.res, loginret.msg);
 			}
 		}
 		else if (0 == strcmp(cmdBuf, "logout")) {
@@ -155,22 +163,13 @@ int main(int agrs, const char* argv[]) {
 			scanf_s("%s", buf, 32);
 			strcpy_s(logout.userName, 32, buf);
 
-			// 消息头
-			DataHeader dh_logout = { sizeof(logout),  CMD_LOGOUT };
-
-			send(_sock, (const char*)(&dh_logout), sizeof(dh_logout), 0);
-
 			send(_sock, (const char*)(&logout), sizeof(logout), 0);
 
 			// 接收服务器返回数据
-			DataHeader dh_ret = {};
 			LoginRet logoutret = {};
-			int dh_len = recv(_sock, (char*)(&dh_ret), sizeof(DataHeader), 0);
-			if (dh_len > 0) {
-				int ret_len = recv(_sock, (char*)(&logoutret), dh_ret.dataLength, 0);
-				if (ret_len > 0) {
-					printf("退出登录状态码：%d， 退出情况：%s\n", logoutret.res, logoutret.msg);
-				}
+			int ret_len = recv(_sock, (char*)(&logoutret), sizeof(LogoutRet), 0);
+			if (ret_len > 0) {
+				printf("收到回应：%d,  数据长度：%d,  退出登录状态码：%d， 退出情况：%s\n", logoutret.cmd, logoutret.dataLength, logoutret.res, logoutret.msg);
 			}
 		}
 		else {
