@@ -45,7 +45,7 @@ using namespace std;
 int main(int agrs, const char* argv[]) {
 	// 启动Windows socket 2.x环境
 
-	// winows启动socket的函数 WSAStartup 需要传入一个版本号 
+	// winows启动socket的函数 WSAStartup 需要传入一个版本号
 	// 创建版本号
 	WORD ver = MAKEWORD(2, 2);
 
@@ -54,15 +54,13 @@ int main(int agrs, const char* argv[]) {
 	WSAStartup(ver, &dat);
 
 	// 1 建立一个socket
-	// 2 绑定接受客户端连接的端口 bind 
-	// 3 监听网络端口 listen 
-	// 4 等待接受客户端连接 accept 
-	// 5 向客户端发送一条数据send 
+	// 2 绑定接受客户端连接的端口 bind
+	// 3 监听网络端口 listen
+	// 4 等待接受客户端连接 accept
+	// 5 向客户端发送一条数据send
 	// 6 关闭socket  closesocket
 
-
 	WSACleanup();
-
 
 	return 0;
 }

@@ -143,32 +143,35 @@ int main(int agrs, const char* argv[]) {
 	}
 	else {
 		printf("客户端链接成功, ip = %s， socket = %d\n", inet_ntoa(clientAddr.sin_addr), _cSock);
-
 	}
-
 
 	while (true)
 	{
-		// 定义消息头
-		DataHeader dh = {};
+		// 定义一个接收缓冲区
+		char recvbuff[4096] = {};
 
 		// 5 接收客户端的请求报文
-		int len = recv(_cSock, (char*)(&dh), sizeof(DataHeader), 0);
+		int len = recv(_cSock, recvbuff, sizeof(DataHeader), 0);
 		if (len <= 0) {
 			printf("客户端退出！\n");
 			break;
 		}
+		// 定义消息头
+		DataHeader* dh = (DataHeader*)(recvbuff);
+
+		//if (dh->dataLength <= len) {
+		//}
 
 		// 6 处理请求 向客户端发送一条数据send
-		switch (dh.cmd)
+		switch (dh->cmd)
 		{
 		case CMD_LOGIN:
 		{
-			Login login = {};
-			int log_len = recv(_cSock, (char*)&login + sizeof(DataHeader), sizeof(Login) - sizeof(DataHeader), 0);
+			int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
+			Login* login = (Login*)(recvbuff);
 			if (log_len > 0) {
-				printf("收到指令: %d， 数据长度: %d\n", login.cmd, login.dataLength);
-				printf("登录用户：%s, 密码：%s\n", login.userName, login.passWord);
+				printf("收到指令: %d， 数据长度: %d\n", login->cmd, login->dataLength);
+				printf("登录用户：%s, 密码：%s\n", login->userName, login->passWord);
 			}
 
 			// 回应报文
@@ -180,11 +183,11 @@ int main(int agrs, const char* argv[]) {
 		break;
 		case CMD_LOGOUT:
 		{
-			Logout logout = {};
-			int log_len = recv(_cSock, (char*)(&logout) + sizeof(DataHeader), sizeof(Logout) - sizeof(DataHeader), 0);
+			int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
+			Logout* logout = (Logout*)(recvbuff);
 			if (log_len > 0) {
-				printf("收到指令: %d， 数据长度: %d\n", logout.cmd, logout.dataLength);
-				printf("用户 【%s】请求退出登录\n", logout.userName);
+				printf("收到指令: %d， 数据长度: %d\n", logout->cmd, logout->dataLength);
+				printf("用户 【%s】请求退出登录\n", logout->userName);
 			}
 
 			// 回应报文
@@ -192,7 +195,6 @@ int main(int agrs, const char* argv[]) {
 			logoutret.res = 200;
 			strcpy_s(logoutret.msg, "退出登录成功\n");
 			send(_cSock, (const char*)(&logoutret), sizeof(logoutret), 0);
-
 		}
 		break;
 		default:
