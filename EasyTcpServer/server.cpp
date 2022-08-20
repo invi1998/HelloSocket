@@ -5,6 +5,8 @@
 #include <WinSock2.h>
 #include <stdio.h>
 
+#include <vector>
+
 // #pragma comment(lib, "ws2_32.lib")
 
 /*
@@ -36,14 +38,14 @@ WSAStartup(ver, &dat); Õâ¸öº¯ÊıÔÚÄÜÕı³£Í¨¹ı±àÒë£¬µ«ÊÇÔÚÁ´½ÓµÄÊ±ºò¾Í»á±¨´í£¬ÊÇÒòÎ
 ¼ÓÈë¾²Ì¬Á´½Ó¿âÓĞÁ½ÖÖ·½·¨£º
 1£º
 Ö±½ÓÔÚ´úÂëÖĞ½øĞĞÌí¼Ó
-#pragma comment(lib, "ws2_32.lib"
+#pragma comment(lib, "ws2_32.lib")
 ÏñÕâÖÖĞ´·¨ÔÚWindowsÀïÃæÊÇÃ»ÎÊÌâµÄ£¬µ«ÊÇÈç¹ûĞèÒª¿çÆ½Ì¨£¬ÄÇÃ´ÕâÖÖĞ´·¨¾Í»áÓĞÎÊÌâ£¬ÔÚ·ÇWindowsÏµÍ³ÏÂÊÇ²»Ö§³ÖÕâÖÖĞ´·¨µÄ
 2£º
 ÁíÍâÒ»ÖÖÊÇÔÚÏîÄ¿µÄÊôĞÔ->Á´½ÓÆ÷->ÊäÈë->¸½¼ÓÒÀÀµÏî->ÔÚÕâÀïÌí¼Ó¾²Ì¬Á´½Ó¿â
 
 */
 
-using namespace std;
+//using namespace std;
 
 enum CMD {
 	CMD_LOGIN,
@@ -93,6 +95,64 @@ struct LogoutRet : public DataHeader {
 	char msg[32];
 };
 
+std::vector<SOCKET> g_clients;
+
+bool processor(SOCKET _cSock) {
+	// ¶¨ÒåÒ»¸ö½ÓÊÕ»º³åÇø
+	char recvbuff[4096] = {};
+
+	// 5 ½ÓÊÕ¿Í»§¶ËµÄÇëÇó±¨ÎÄ
+	int len = recv(_cSock, recvbuff, sizeof(DataHeader), 0);
+	if (len <= 0) {
+		printf("¿Í»§¶ËÍË³ö£¡\n");
+		return false;
+	}
+	// ¶¨ÒåÏûÏ¢Í·
+	DataHeader* dh = (DataHeader*)(recvbuff);
+
+	switch (dh->cmd)
+	{
+	case CMD_LOGIN:
+	{
+		int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
+		Login* login = (Login*)(recvbuff);
+		if (log_len > 0) {
+			printf("ÊÕµ½Ö¸Áî: %d£¬ Êı¾İ³¤¶È: %d\n", login->cmd, login->dataLength);
+			printf("µÇÂ¼ÓÃ»§£º%s, ÃÜÂë£º%s\n", login->userName, login->passWord);
+		}
+
+		// »ØÓ¦±¨ÎÄ
+		LoginRet loginret;
+		loginret.res = 200;
+		strcpy_s(loginret.msg, "µÇÂ¼³É¹¦\n");
+		send(_cSock, (const char*)(&loginret), sizeof(loginret), 0);
+	}
+	break;
+	case CMD_LOGOUT:
+	{
+		int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
+		Logout* logout = (Logout*)(recvbuff);
+		if (log_len > 0) {
+			printf("ÊÕµ½Ö¸Áî: %d£¬ Êı¾İ³¤¶È: %d\n", logout->cmd, logout->dataLength);
+			printf("ÓÃ»§ ¡¾%s¡¿ÇëÇóÍË³öµÇÂ¼\n", logout->userName);
+		}
+
+		// »ØÓ¦±¨ÎÄ
+		LogoutRet logoutret;
+		logoutret.res = 200;
+		strcpy_s(logoutret.msg, "ÍË³öµÇÂ¼³É¹¦\n");
+		send(_cSock, (const char*)(&logoutret), sizeof(logoutret), 0);
+	}
+	break;
+	default:
+		DataHeader dh_err = { 0, CMD_ERROR };
+		send(_cSock, (const char*)(&dh_err), sizeof(dh_err), 0);
+		break;
+	}
+
+	return true;
+}
+
 int main(int agrs, const char* argv[]) {
 	// Æô¶¯Windows socket 2.x»·¾³
 
@@ -133,78 +193,138 @@ int main(int agrs, const char* argv[]) {
 		printf("¶Ë¿Ú¼àÌı ing...\n");
 	}
 
-	//4 µÈ´ı½ÓÊÜ¿Í»§¶ËÁ¬½Ó accept
-	sockaddr_in clientAddr = {};
-	int nAddrLen = sizeof(sockaddr_in);
-	SOCKET _cSock = INVALID_SOCKET;
-	_cSock = accept(_sock, (sockaddr*)(&clientAddr), &nAddrLen);
-	if (INVALID_SOCKET == _cSock) {
-		printf("Á¬½Ó¿Í»§¶ËÊ§°Ü\n");
-	}
-	else {
-		printf("¿Í»§¶ËÁ´½Ó³É¹¦, ip = %s£¬ socket = %d\n", inet_ntoa(clientAddr.sin_addr), _cSock);
-	}
-
 	while (true)
 	{
-		// ¶¨ÒåÒ»¸ö½ÓÊÕ»º³åÇø
-		char recvbuff[4096] = {};
+		// select
+		// ²®¿ËÀû socket
+		/*select(
+			_In_ int nfds,			µÚÒ»¸ö²ÎÊı£º×î´óÃèÊö·û+1£¨Õâ¸öÔÚWindowsÀïÃ»ÓĞÌ«´óÒâÒå£¬ÔÚUnix/LinuxÏµÍ³Àï²ÅÓĞÓÃ£©
+			_Inout_opt_ fd_set FAR * readfds,	¿É¶Á¼¯ºÏ ¿É¶ÁĞÔ¼ì²é(ÓĞÊı¾İ¿É¶ÁÈë£¬Á¬½Ó¹Ø±Õ£¬ÖØÉè£¬ÖÕÖ¹)£¬Îª¿ÕÔò²»¼ì²é¿É¶ÁĞÔ
+			_Inout_opt_ fd_set FAR * writefds,	¿ÉĞ´¼¯ºÏ ¿ÉĞ´ĞÔ¼ì²é(ÓĞÊı¾İ¿É·¢³ö)£¬Îª¿ÕÔò²»¼ì²é¿ÉĞ´ĞÔ
+			_Inout_opt_ fd_set FAR * exceptfds,		Òì³£¼¯ºÏ ´øÍâÊı¾İ¼ì²é(´øÍâÊı¾İ)£¬Îª¿ÕÔò²»¼ì²é
+			_In_opt_ const struct timeval FAR * timeout
+			);
 
-		// 5 ½ÓÊÕ¿Í»§¶ËµÄÇëÇó±¨ÎÄ
-		int len = recv(_cSock, recvbuff, sizeof(DataHeader), 0);
-		if (len <= 0) {
-			printf("¿Í»§¶ËÍË³ö£¡\n");
+			selectº¯Êı²ÎÊıÏê½â£º¡¡¡¡
+
+			Èı¸ö fd_set²ÎÊı£ºÒ»¸öÓÃÓÚ¼ì²é¿É¶ÁĞÔ£¨readfds£©£¬Ò»¸öÓÃÓÚ¼ì²é¿ÉĞ´ĞÔ£¨writefds£©£¬ÁíÒ»¸öÓÃÓÚÀıÍâÊı¾İ£¨ excepfds£©¡£
+
+			´Ó¸ù±¾ÉÏËµ£¬fdsetÊı¾İÀàĞÍ´ú±í×ÅÒ»ÏµÁĞÌØ¶¨Ì×½Ó×ÖµÄ¼¯ºÏ¡£ÆäÖĞ£¬
+
+			readfds¼¯ºÏ°üÀ¨·ûºÏÏÂÊöÈÎºÎÒ»¸öÌõ¼şµÄÌ×½Ó×Ö£º
+
+			¡ö ÓĞÊı¾İ¿ÉÒÔ¶ÁÈë¡£
+			¡ö Á¬½ÓÒÑ¾­¹Ø±Õ¡¢ÖØÉè»òÖĞÖ¹¡£
+			¡ö ¼ÙÈçÒÑµ÷ÓÃÁËlisten£¬¶øÇÒÒ»¸öÁ¬½ÓÕıÔÚ½¨Á¢£¬ÄÇÃ´acceptº¯Êıµ÷ÓÃ»á³É¹¦¡£
+
+			writefds¼¯ºÏ°üÀ¨·ûºÏÏÂÊöÈÎºÎÒ»¸öÌõ¼şµÄÌ×½Ó×Ö£º
+
+			¡ö ÓĞÊı¾İ¿ÉÒÔ·¢³ö¡£
+			¡ö Èç¹ûÒÑÍê³ÉÁË¶ÔÒ»¸ö·ÇËø¶¨Á¬½Óµ÷ÓÃµÄ´¦Àí£¬Á¬½Ó¾Í»á³É¹¦¡£
+			×îºó£¬exceptfds¼¯ºÏ°üÀ¨·ûºÏÏÂÊöÈÎºÎÒ»¸öÌõ¼şµÄÌ×½Ó×Ö£º
+			¡ö ¼ÙÈçÒÑÍê³ÉÁË¶ÔÒ»¸ö·ÇËø¶¨Á¬½Óµ÷ÓÃµÄ´¦Àí£¬Á¬½Ó³¢ÊÔ¾Í»áÊ§°Ü¡£
+			¡ö ÓĞ´øÍâ£¨out-of-band£¬OOB£©Êı¾İ¿É¹©¶ÁÈ¡¡£
+
+			×îºóÒ»¸ö²ÎÊıtimeout:
+
+			¶ÔÓ¦µÄÊÇÒ»¸öÖ¸Õë£¬ËüÖ¸ÏòÒ»¸ötimeval½á¹¹£¬ÓÃÓÚ¾ö¶¨select×î¶àµÈ´ı I / O²Ù×÷Íê³É¶à¾ÃµÄÊ±¼ä¡£
+
+			Èç timeoutÊÇÒ»¸ö¿ÕÖ¸Õë£¬ÄÇÃ´selectµ÷ÓÃ»áÎŞÏŞÆÚµØ¡°Ëø¶¨¡±»òÍ£¶ÙÏÂÈ¥£¬Ö±µ½ÖÁÉÙÓĞÒ»¸öÃèÊö·û·ûºÏÖ¸¶¨µÄÌõ¼şºó½áÊø¡£
+
+			¶Ôtimeval½á¹¹µÄ¶¨ÒåÈçÏÂ£º
+
+			struct timeval {
+			long tv_sec;
+			long tv_usec;
+			} ;
+
+			Èô½«³¬Ê±ÖµÉèÖÃÎª£¨0,0£©£¬±íÃ÷select»áÁ¢¼´·µ»Ø£¬ÔÊĞíÓ¦ÓÃ³ÌĞò¶Ô select²Ù×÷½øĞĞ¡°ÂÖÑ¯¡±¡£³öÓÚ¶ÔĞÔÄÜ·½ÃæµÄ¿¼ÂÇ£¬Ó¦±ÜÃâÕâÑùµÄÉèÖÃ¡£
+
+			select³É¹¦Íê³Éºó£¬»áÔÚ fd_set½á¹¹ÖĞ£¬·µ»Ø¸ÕºÃÓĞÎ´Íê³ÉµÄI/O²Ù×÷µÄËùÓĞÌ×½Ó×Ö¾ä±úµÄ×ÜÁ¿¡£
+
+			Èô³¬¹ıtimevalÉè¶¨µÄÊ±¼ä£¬±ã»á·µ»Ø0¡£
+		*/
+
+		/*
+		selectÄ£ĞÍµÄ¹¤×÷²½Öè:
+		(1)¶¨ÒåÒ»¸ö¼¯ºÏfd_set²¢ÓÃfd_zeroºê³õÊ¼»¯Îª¿Õ
+
+		(2)ÓÃFD_SETºê£¬°ÑÌ×½Ó×Ö¾ä±ú¼ÓÈëµ½fd_set¼¯ºÏ
+
+		(3)µ÷ÓÃselectº¯Êı£¬¼ì²éÃ¿¸öÌ×½Ó×ÖµÄ¿É¶Á¿ÉĞ´ĞÔ£¬selectÍê³Éºó£¬»á·µ»ØËùÓĞÔÚfd_set¼¯ºÏÖĞÓĞÊı¾İµ½´ïµÄsocketµÄsocket¾ä±ú×ÜÊı£¬²¢¶ÔÃ¿¸ö¼¯ºÏ½øĞĞ¸üĞÂ£¬¼´Ã»ÓĞÊı¾İµ½´ïµÄsocketÔÚÔ­¼¯ºÏÖĞ»á±»ÖÃ³É¿Õ¡£
+		(4)¸ù¾İselectµÄ·µ»ØÖµÒÔ¼°FD_ISSETºê£¬¶ÔFD_SET¼¯ºÏ½øĞĞ¼ì²é
+		(5)ÖªµÀÁËÃ¿¸ö¼¯ºÏÖĞ¡°´ı¾ö¡±µÄI/O²Ù×÷ºó£¬¶ÔÏàÓ¦I/O²Ù×÷½øĞĞ´¦Àí£¬·µ»Ø²½Öè1£¬¼ÌĞøselect
+
+		selectº¯Êı·µ»Øºó£¬»áĞŞ¸ÄFD_SETµÄ½á¹¹£¬É¾³ı²»´æÔÚ´ı¾öIO²Ù×÷µÄÌ×½Ó×Ö£¬ÕâÒ²¾ÍÊÇÎªÊ²Ã´ÎÒÃÇÖ®ºóÒªÓÃFD_ISSETÅĞ¶ÏÊÇ·ñ»¹ÔÚ¼¯ºÏÖĞµÄÔ­Òò¡£
+		*/
+
+		// ´´½¨fdset¼¯ºÏ
+		fd_set fdRead;
+		fd_set fdWrite;
+		fd_set fdExp;
+
+		// Çå¿Õfdset¼¯ºÏÊı¾İ
+		FD_ZERO(&fdRead);
+		FD_ZERO(&fdWrite);
+		FD_ZERO(&fdExp);
+
+		// °ÑÌ×½Ó×Ö¾ä±ú¼ÓÈëµ½fdset¼¯ºÏ
+		FD_SET(_sock, &fdRead);
+		FD_SET(_sock, &fdWrite);
+		FD_SET(_sock, &fdExp);
+
+		for (auto iter = g_clients.rbegin(); iter != g_clients.rend(); ++iter) {
+			FD_SET(*iter, &fdRead);
+		}
+
+		// nfds ÊÇÒ»¸öÕûÊıÖµ£¬Ö¸µÄÊÇfd_set¼¯ºÏÖĞËùÓĞµÄÃèÊö·û£¨socket£©µÄ·¶Î§£¬¶ø²»ÊÇÊıÁ¿£¬ËùÒÔÓÃ×î´óÄÇ¸öÃèÊö·û+1¼´¿É
+		// ÔÚWindowsÏÂÕâ¸ö²ÎÊıÔÚselectÄÚ²¿ÒÑ¾­×öÁË×Ô¶¯¼ÆËã£¬Êµ¼ÊÉÏÃ»ÓĞÓÃµ½³ÌĞò´«µİµÄÕâ¸öÖµ
+		int ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, NULL);
+		if (ret < 0) {
+			printf("select ´íÎó£¬³ÌĞòÍË³ö£¡\n");
 			break;
 		}
-		// ¶¨ÒåÏûÏ¢Í·
-		DataHeader* dh = (DataHeader*)(recvbuff);
+
+		if (FD_ISSET(_sock, &fdRead)) {
+			// ÓĞ¿É¶Á £¨ËµÃ÷ÓĞ¿Í»§¶ËÁ´½Ó½øÀ´£©
+			FD_CLR(_sock, &fdRead);
+
+			//4 µÈ´ı½ÓÊÜ¿Í»§¶ËÁ¬½Ó accept
+			sockaddr_in clientAddr = {};
+			int nAddrLen = sizeof(sockaddr_in);
+			SOCKET _cSock = INVALID_SOCKET;
+			_cSock = accept(_sock, (sockaddr*)(&clientAddr), &nAddrLen);
+			if (INVALID_SOCKET == _cSock) {
+				printf("Á¬½Ó¿Í»§¶ËÊ§°Ü\n");
+			}
+			else {
+				printf("¿Í»§¶ËÁ´½Ó³É¹¦, ip = %s£¬ socket = %d\n", inet_ntoa(clientAddr.sin_addr), _cSock);
+			}
+
+			g_clients.push_back(_cSock);
+		}
 
 		//if (dh->dataLength <= len) {
 		//}
 
 		// 6 ´¦ÀíÇëÇó Ïò¿Í»§¶Ë·¢ËÍÒ»ÌõÊı¾İsend
-		switch (dh->cmd)
-		{
-		case CMD_LOGIN:
-		{
-			int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
-			Login* login = (Login*)(recvbuff);
-			if (log_len > 0) {
-				printf("ÊÕµ½Ö¸Áî: %d£¬ Êı¾İ³¤¶È: %d\n", login->cmd, login->dataLength);
-				printf("µÇÂ¼ÓÃ»§£º%s, ÃÜÂë£º%s\n", login->userName, login->passWord);
+		for (auto iter = g_clients.begin(); iter != g_clients.end();) {
+			if (processor(*iter) == false) {
+				closesocket(*iter);
+				iter = g_clients.erase(iter);
 			}
-
-			// »ØÓ¦±¨ÎÄ
-			LoginRet loginret;
-			loginret.res = 200;
-			strcpy_s(loginret.msg, "µÇÂ¼³É¹¦\n");
-			send(_cSock, (const char*)(&loginret), sizeof(loginret), 0);
-		}
-		break;
-		case CMD_LOGOUT:
-		{
-			int log_len = recv(_cSock, recvbuff + sizeof(DataHeader), dh->dataLength - sizeof(DataHeader), 0);
-			Logout* logout = (Logout*)(recvbuff);
-			if (log_len > 0) {
-				printf("ÊÕµ½Ö¸Áî: %d£¬ Êı¾İ³¤¶È: %d\n", logout->cmd, logout->dataLength);
-				printf("ÓÃ»§ ¡¾%s¡¿ÇëÇóÍË³öµÇÂ¼\n", logout->userName);
+			else
+			{
+				++iter;
 			}
-
-			// »ØÓ¦±¨ÎÄ
-			LogoutRet logoutret;
-			logoutret.res = 200;
-			strcpy_s(logoutret.msg, "ÍË³öµÇÂ¼³É¹¦\n");
-			send(_cSock, (const char*)(&logoutret), sizeof(logoutret), 0);
-		}
-		break;
-		default:
-			DataHeader dh_err = { 0, CMD_ERROR };
-			send(_cSock, (const char*)(&dh_err), sizeof(dh_err), 0);
-			break;
 		}
 	}
 
 	//6 ¹Ø±Õsocket  closesocket
+	for (auto iter = g_clients.begin(); iter != g_clients.end(); ++iter) {
+		closesocket(*iter);
+	}
+
 	closesocket(_sock);
 
 	WSACleanup();
